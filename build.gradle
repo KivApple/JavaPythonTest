@@ -61,3 +61,7 @@ model {
 }
 
 run.dependsOn 'pythonProxySharedLibrary'
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '4.0.1'
+}
