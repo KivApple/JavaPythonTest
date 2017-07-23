@@ -1,5 +1,7 @@
 package com.eternal_search.java_python_test;
 
+import java.lang.reflect.Field;
+
 public class Main {
 
 	public static void main(String[] args) {
@@ -15,9 +17,7 @@ public class Main {
 	private native static void callPython(String code);
 	
 	static {
-		System.out.println(System.getProperty("java.library.path"));
-		//System.loadLibrary("libpythonProxy");
-		System.load("/home/kiv/Projects/JavaPythonTest/build/libs/pythonProxy/shared/libpythonProxy.so");
+		System.loadLibrary("pythonProxy");
 	}
 
 }
