@@ -1,0 +1,61 @@
+apply plugin: 'java'
+apply plugin: 'c'
+apply plugin: 'application'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+compileJava.options.encoding = 'UTF-8'
+
+project.version = '0.0.1'
+
+mainClassName = 'com.eternal_search.java_python_test.Main'
+
+jar {
+	baseName = project.name
+	
+	manifest {
+		attributes 'Main-Class': mainClassName
+	}
+}
+
+run {
+	systemProperty 'java.library.path', "${project.buildDir}/libs/pythonProxy/shared"
+}
+
+model {
+	components {
+		pythonProxy(NativeLibrarySpec) {}
+	}
+}
+
+def jniIncludeDir = '/usr/lib/jvm/java-8-openjdk/include' // TODO: Autodetect
+def jdkPlatform = 'linux' // TODO: Autodetect
+
+def pkgConfigQuery(String query) {
+	def pkgConfig = "pkg-config $query".execute()
+	pkgConfig.waitFor()
+	return pkgConfig.in.text.trim()
+}
+
+def pythonCFlags = pkgConfigQuery('python3 --cflags')
+def pythonLibs = pkgConfigQuery('python3 --libs')
+
+model {
+	binaries {
+		withType(SharedLibraryBinarySpec) {
+			cCompiler.args "-I", "${jniIncludeDir}"
+			cCompiler.args "-I", "${jniIncludeDir}/${jdkPlatform}"
+			cCompiler.args pythonCFlags
+			linker.args pythonLibs
+		}
+		withType(StaticLibraryBinarySpec) {
+			cCompiler.args "-I", "${jniIncludeDir}"
+			cCompiler.args "-I", "${jniIncludeDir}/${jdkPlatform}"
+			cCompiler.args pythonCFlags
+			linker.args pythonLibs
+		}
+	}
+}
+
+run.dependsOn 'pythonProxySharedLibrary'
