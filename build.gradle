@@ -1,3 +1,5 @@
+import java.nio.file.Paths
+
 apply plugin: 'java'
 apply plugin: 'c'
 apply plugin: 'application'
@@ -29,8 +31,8 @@ model {
 	}
 }
 
-def jniIncludeDir = '/usr/lib/jvm/java-8-openjdk/include' // TODO: Autodetect
-def jdkPlatform = 'linux' // TODO: Autodetect
+def jniIncludeDir = Paths.get(System.getProperty("java.home"), "..", "include").normalize().toString()
+def jdkPlatform = 'linux' // TODO: Autodetect (linux, win32, darwin)
 
 def pkgConfigQuery(String query) {
 	def pkgConfig = "pkg-config $query".execute()
