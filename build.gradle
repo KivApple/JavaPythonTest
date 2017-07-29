@@ -47,15 +47,36 @@ def pkgConfigQuery(String query) {
 	pkgConfig.waitFor()
 	return pkgConfig.in.text.trim()
 }
+def pythonFoundInPkgConfig = false
 for (String flag : pkgConfigQuery('python3 --cflags --libs').split(' ')) {
 	if (flag.startsWith('-I')) {
 		cIncludeDirs.add(flag.substring(2))
+		pythonFoundInPkgConfig = true
 	} else if (flag.startsWith('-L')) {
 		cLibsDirs.add(flag.substring(2))
 	} else if (flag.startsWith('-l')) {
 		cLibs.add(flag.substring(2))
 	} else {
 		cFlags.add(flag)
+	}
+}
+if (!pythonFoundInPkgConfig) {
+	def paths = System.getenv('PATH').split(Os.isFamily(Os.FAMILY_WINDOWS) ? ';' : ':')
+	def libs = new HashSet<String>()
+	for (String path : paths) {
+		if(new File(path + File.separator + "python").exists() || new File(path + File.separator + "python.exe").exists()) {
+			cIncludeDirs.add(path.toString() + File.separator + "include")
+			def libsDir = path.toString() + File.separator + "libs"
+			cLibsDirs.add(libsDir)
+			for (File fileEntry : new File(libsDir).listFiles()) {
+				int i1=fileEntry.toString().lastIndexOf("libs") + 5
+				int i2=fileEntry.toString().lastIndexOf(".")
+				libs.add(fileEntry.toString().substring(i1))
+			}
+		}
+	}
+	for (String lib : libs) {
+		cLibs.add(lib)
 	}
 }
 
