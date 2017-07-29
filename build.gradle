@@ -1,4 +1,5 @@
 import java.nio.file.Paths
+import org.apache.tools.ant.taskdefs.condition.Os
 
 apply plugin: 'java'
 apply plugin: 'c'
@@ -31,35 +32,83 @@ model {
 	}
 }
 
-def jniIncludeDir = Paths.get(System.getProperty("java.home"), "..", "include").normalize().toString()
-def jdkPlatform = 'linux' // TODO: Autodetect (linux, win32, darwin)
+ext.cLibs = []
+ext.cLibsDirs = []
+ext.cIncludeDirs = []
+ext.cFlags = []
+
+def jniPlatform = Os.isFamily(Os.FAMILY_WINDOWS) ? 'win32' : Os.isFamily(Os.FAMILY_UNIX) ? 'linux' : 'darwin'
+def jniIncludeDir = Paths.get(System.getProperty('java.home'), '..', "include").normalize().toString().replace("\\","/")
+cIncludeDirs.add(jniIncludeDir)
+cIncludeDirs.add("$jniIncludeDir/$jniPlatform")
 
 def pkgConfigQuery(String query) {
 	def pkgConfig = "pkg-config $query".execute()
 	pkgConfig.waitFor()
 	return pkgConfig.in.text.trim()
 }
-
-def pythonCFlags = pkgConfigQuery('python3 --cflags')
-def pythonLibs = pkgConfigQuery('python3 --libs')
+for (String flag : pkgConfigQuery('python3 --cflags --libs').split(' ')) {
+	if (flag.startsWith('-I')) {
+		cIncludeDirs.add(flag.substring(2))
+	} else if (flag.startsWith('-L')) {
+		cLibsDirs.add(flag.substring(2))
+	} else if (flag.startsWith('-l')) {
+		cLibs.add(flag.substring(2))
+	} else {
+		cFlags.add(flag)
+	}
+}
 
 model {
 	binaries {
 		withType(SharedLibraryBinarySpec) {
-			cCompiler.args "-I", "${jniIncludeDir}"
-			cCompiler.args "-I", "${jniIncludeDir}/${jdkPlatform}"
-			cCompiler.args pythonCFlags
-			linker.args pythonLibs
+			def includeDirFlagPrefix, libraryDirFlagPrefix, libraryFlagPrefix, libraryFlagSuffix
+			if (toolChain in VisualCpp) {
+				includeDirFlagPrefix = '/I'
+				libraryDirFlagPrefix = '/LIBPATH:'
+				libraryFlagPrefix = ''
+				libraryFlagSuffix = '.lib'
+			} else {
+				includeDirFlagPrefix = '-I'
+				libraryDirFlagPrefix = '-L'
+				libraryFlagPrefix = '-l'
+				libraryFlagSuffix = ''
+			}
+			for (String includeDir : cIncludeDirs) {
+				cCompiler.args "$includeDirFlagPrefix$includeDir"
+			}
+			for (String libraryDir : cLibsDirs) {
+				linker.args "$libraryDirFlagPrefix$libraryDir"
+			}
+			for (String library : cLibs) {
+				linker.args "$libraryFlagPrefix$library$libraryFlagSuffix"
+			}
 		}
 		withType(StaticLibraryBinarySpec) {
-			cCompiler.args "-I", "${jniIncludeDir}"
-			cCompiler.args "-I", "${jniIncludeDir}/${jdkPlatform}"
-			cCompiler.args pythonCFlags
-			linker.args pythonLibs
+			def includeDirFlagPrefix, libraryDirFlagPrefix, libraryFlagPrefix, libraryFlagSuffix
+			if (toolChain in VisualCpp) {
+				includeDirFlagPrefix = '/I'
+				libraryDirFlagPrefix = '/LIBPATH:'
+				libraryFlagPrefix = ''
+				libraryFlagSuffix = '.lib'
+			} else {
+				includeDirFlagPrefix = '-I'
+				libraryDirFlagPrefix = '-L'
+				libraryFlagPrefix = '-l'
+				libraryFlagSuffix = ''
+			}
+			for (String includeDir : cIncludeDirs) {
+				cCompiler.args "$includeDirFlagPrefix$includeDir"
+			}
+			for (String libraryDir : cLibsDirs) {
+				linker.args "$libraryDirFlagPrefix$libraryDir"
+			}
+			for (String library : cLibs) {
+				linker.args "$libraryFlagPrefix$library$libraryFlagSuffix"
+			}
 		}
 	}
 }
-
 run.dependsOn 'pythonProxySharedLibrary'
 
 task wrapper(type: Wrapper) {
